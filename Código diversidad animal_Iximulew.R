@@ -1,6 +1,7 @@
 # Programa para analizar el impacto de diversidad animalia sobre seguridad alimentaria en
 # pequeños productores pecuarios. Escrito por Julien Malard y Anh Bui.
 # Contacto: julien.malard@mail.mcgill.ca (para dudas, errores, recomendaciones, complimentos)
+# Cualquier problema con el programa o con R en general, quedo a la órden.
 
 # Nota: usted tendrá que cambiar las partes apropiadas del código para su base de datos y equipo.
 
@@ -58,6 +59,10 @@ datos['Totalanimales'] <- datos.hogares[[col_Totalanimales]]
 hist(log(datos$Ingresos))
 hist(datos$Tamaño_familia)
 
+# Generar los otros datos necesarios para los análisis
+
+datos["Ingresoporcápita"] = datos$Ingresos/datos$Tamaño_familia
+datos["log_Ingresoporcápita"] = log(datos$Ingresoporcápita+1)  # Añadir 1 porque algunos tienen Ingreso de 0
 
 #### 2. Calcular la seguridad alimentaria ####
 datos["SegAli"] <- NA
@@ -94,11 +99,11 @@ for (a in 1:nrow(datos)){
   
   # Convertir el total de respuestas positivas a la categoría de inseguridad alimentaria
   if(datos$SegAli.puntaje[a]==0) {datos$SegAli[a] <- 0}
-  if(datos$P01H09[a]==0){  # Si hay niños en el hogar
+  if(datos[[SegAli.col[9]]][a]==0){  # Si hay niños en el hogar
     if(datos$SegAli.puntaje[a]>=1 & datos$SegAli.puntaje[a]<=3){datos$SegAli[a]<- 1}
     if(datos$SegAli.puntaje[a]>=4 & datos$SegAli.puntaje[a]<=6){datos$SegAli[a]<- 2}
     if(datos$SegAli.puntaje[a]>=7 & datos$SegAli.puntaje[a]<=8){datos$SegAli[a]<- 3}
-  } else if (datos$P01H09[a]==1) {  # Si no hay niños
+  } else if (datos[[SegAli.col[9]]][a]==1) {  # Si no hay niños
     if(datos$SegAli.puntaje[a]>=1 & datos$SegAli.puntaje[a]<=5){datos$SegAli[a]<- 1}
     if(datos$SegAli.puntaje[a]>=6 & datos$SegAli.puntaje[a]<=10){datos$SegAli[a]<- 2}
     if(datos$SegAli.puntaje[a]>=11 & datos$SegAli.puntaje[a]<=15){datos$SegAli[a]<- 3}
@@ -149,11 +154,6 @@ datos["Shannon.UG"] <- NA
 datos["Gini.UG"] <- NA
 datos["BuzasGibson.UG"] <- NA
 
-# Una lista de los nombres de los tipos de animales en su base de datos.
-nombres = c("Vacas, Toros, Terneros","Cerdos","Ovejas, Peligueyes","Cabras",
-            "Gallinas, Pollos","Pavos, Chompipes","Patos","Caballos, Burros, Mulas",
-            "Colmenas","Peces, Camarones")
-
 
 # Nuestros datos de animales están en otra base de datos. Si los suyos ya se encuentran en 
 # 'datos', puede saltar estas líneas abajo.
@@ -173,9 +173,11 @@ prim.Col <- ncol(datos) + 1 # El número de la primera columna
 # en vez de utilizar el código abajo.
 col_val.animales = paste(nombres, '.val', sep='')
 
-# generar columnas vacías para los valores y números de los animales
+# Generar columnas vacías para los valores y números de los animales
 for (i in 1:length(nombres)) {  # Para cada tipo de animal
   datos[[col_val.animales[i]]] <- NA  # Crear una columna vacía
+}
+for (i in 1:length(nombres)) {  # Para cada tipo de animal
   datos[[nombres[i]]] <- NA  # Crear una columna vacía
 }
 
@@ -195,6 +197,21 @@ for (i in 1:nrow(datos)){  # Para cada hogar
 # Si estaba saltando el código arriba porque su base de datos ya tenía los valores 
 # monetarios de los animales, aquí tiene que reempezar a seguir el código.
 # En ese caso, no se le olvide generar la lista col_val.animales apropiada (ver arriba).
+
+# Una lista de los nombres de los tipos de animales en su base de datos.
+nombres = c("Vacas, Toros, Terneros","Cerdos","Ovejas, Peligueyes","Cabras",
+            "Gallinas, Pollos","Pavos, Chompipes","Patos","Caballos, Burros, Mulas",
+            "Colmenas","Peces, Camarones")
+
+# Poner los valores de unidades ganaderas para cada tipo de animal.
+# DEBE estar en el mismo orden que "nombres".
+ValorUG <- c(1.0000, 0.3333, 0.3333, 0.3333, 0.0667, 0.0667, 0.0667, 1.5000, 0.2000, 0.0667)
+
+datos["UniGan"] = NA
+for (i in 1:length(nombres)) {
+  datos['UniGan'] <- rowSums(data.frame(datos[['UniGan']], datos[[nombres[i]]] * ValorUG[i]), na.rm = T)
+}
+datos["log_UniGan"] = log(datos$UniGan)
 
 ### Generar y guardar un gráfico de los valores de los animales
 
@@ -287,11 +304,13 @@ for(a in 1:nrow(datos)){  # para cada hogar
   for(b in 1:length(nombres)){  # para cada tipo de animal
     animaleshogar[b] <- datos[[nombres[b]]][a]
   }
-  datos$Simpson[a] <- Simpson(animaleshogar)
-  datos$Shannon[a] <- Shannon(animaleshogar)
-  datos$Gini[a] <- Gini(animaleshogar)
-  datos$Margalef[a] <- Margalef(animaleshogar)
-  datos$BuzasGibson[a] <- BuzasGibson(animaleshogar)
+  if (sum(animaleshogar) > 0) {
+    datos$Simpson[a] <- Simpson(animaleshogar)
+    datos$Shannon[a] <- Shannon(animaleshogar)
+    datos$Gini[a] <- Gini(animaleshogar)
+    datos$Margalef[a] <- Margalef(animaleshogar)
+    datos$BuzasGibson[a] <- BuzasGibson(animaleshogar)
+  }
 }
 
 # Verificar resultados
@@ -350,10 +369,10 @@ for(a in 1:nrow(datos)){    #para cada hogar
 }
 
 # Verificar resultados
-weighted.mean(datos$Simpson.val.med, datos$Peso.estad)
-weighted.mean(datos$Shannon.val.med, datos$Peso.estad)
-weighted.mean(datos$Gini.val.med, datos$Peso.estad)
-weighted.mean(datos$BuzasGibson.val.med, datos$Peso.estad)
+weighted.mean(datos$Simpson.val.med, datos$Peso.estad, na.rm = T)
+weighted.mean(datos$Shannon.val.med, datos$Peso.estad, na.rm = T)
+weighted.mean(datos$Gini.val.med, datos$Peso.estad, na.rm = T)
+weighted.mean(datos$BuzasGibson.val.med, datos$Peso.estad, na.rm = T)
 
 write.csv(datos,'Datos calculados.csv', row.names=FALSE)  # guardar los resueltos
 
@@ -402,25 +421,24 @@ for(a in 1:nrow(datos)){  #para cada hogar
   for(b in 1:length(nombres)){  # para cada tipo de animal
     animaleshogar[b] <- datos[[nombres[b]]][a]*ValorDept[[datos$Dept[a]]][b]
   }
-  datos$Simpson.val.dept[a] <- Simpson(animaleshogar)
-  datos$Shannon.val.dept[a] <- Shannon(animaleshogar)
-  datos$Gini.val.dept[a] <- Gini(animaleshogar)
-  datos$BuzasGibson.val.dept[a] <- BuzasGibson(animaleshogar)
-  # Notar: Para Margalef no se calculan modificaciones
+  if (sum(animaleshogar) > 0) {
+    datos$Simpson.val.dept[a] <- Simpson(animaleshogar)
+    datos$Shannon.val.dept[a] <- Shannon(animaleshogar)
+    datos$Gini.val.dept[a] <- Gini(animaleshogar)
+    datos$BuzasGibson.val.dept[a] <- BuzasGibson(animaleshogar)
+    # Notar: Para Margalef no se calculan modificaciones
+  }
 }
 
 # Verificar los resultados
-weighted.mean(datos$Simpson.val.dept, datos$Peso.estad)
-weighted.mean(datos$Shannon.val.dept, datos$Peso.estad)
-weighted.mean(datos$Gini.val.dept, datos$Peso.estad)
-weighted.mean(datos$BuzasGibson.val.dept, datos$Peso.estad)
+weighted.mean(datos$Simpson.val.dept, datos$Peso.estad, na.rm = T)
+weighted.mean(datos$Shannon.val.dept, datos$Peso.estad, na.rm = T)
+weighted.mean(datos$Gini.val.dept, datos$Peso.estad, na.rm = T)
+weighted.mean(datos$BuzasGibson.val.dept, datos$Peso.estad, na.rm = T)
 
 write.csv(datos,'Datos calculados.csv', row.names=FALSE)  # guardar los resultados
 
 ### Calcular los Índices: unidades ganaderas ###
-# Poner los valores de unidades ganaderas para cada tipo de animal.
-# DEBE estar en el mismo orden que "nombres".
-ValorUG <- c(1.0000, 0.3333, 0.3333, 0.3333, 0.0667, 0.0667, 0.0667, 1.5000, 0.2000, 0.0667)
 
 # Calcular los índices con peso UG
 
@@ -533,16 +551,9 @@ install.packages("ordinal")  # Instalar si necesario
 library("ordinal")
 
 
-# Generar los otros datos necesarios para los análisis
-datos["UniGan"] = NA
-for (i in 1:length(nombres)) {
-  datos['UniGan'] <- sum(datos['UniGan'], datos[[nombres]] * ValorUG[i], na.rm = T)
-}
-datos["log_UniGan"] = log(datos$UniGan)
-
-datos["Ingresoporcápita"] = datos$Ingresos/datos$PPB04
-datos["log_Ingresoporcápita"] = log(datos$Ingresoporcápita+1)  # Añadir 1 porque algunos tienen Ingreso de 0
 datos$SegAli <- as.factor(datos$SegAli)  # Cambio de formato necesario para los análisis que siguen
+
+write.csv(datos,'Datos calculados.csv', row.names=FALSE)  # Guardar los datos
 
 AIC <- NULL; logLik <- NULL  # Medidas de modelos estadísticos
 modelos <- NULL  # Lista para guardar los resultados de los análisis
@@ -551,7 +562,7 @@ for(a in 1:length(Índicesfinales)){
   AIC[a] <- as.numeric(levels(logit$info$AIC)[as.integer(logit$info$AIC)])
   logLik[a] <- logit$logLik
   assign(paste("logit_",Índicesfinales[a],sep=""),logit)
-  modelos[a] <- logit
+  modelos[[a]] <- logit
 }
 
 # Un logLik negativo más pequeño es mejor
@@ -563,6 +574,9 @@ for(a in 1:length(Índicesfinales)){
 -logit_Gini.val.ind$logLik
 -logit_Gini.val.med$logLik
 -logit_Gini.UG$logLik
+
+# AIC pequeño es mejor
+AIC
 
 # Ver los resultados de los modelos
 summary(logit_Shannon)
@@ -651,21 +665,42 @@ Inter(datos$log_Ingresoporcápita, datos$log_UniGan, as.numeric(datos$SegAli))
 
 #### 7. Análisis de agrupamiento ####
 
-# Cargar datos
-datos.func = read.csv('F:/Julien/PhD/Iximulew/MDS SAN/Datos calibración MDS/Datos datos.hogares/Limp_Actividades pecuarias.csv', header=1)
-datos.func.prod = read.csv('F:/Julien/PhD/Iximulew/MDS SAN/Datos calibración MDS/Datos datos.hogares/Limp_t27_cap14_e_final.csv', header = 1)
+# Cargar datos de producción de animales por los agricultores
+datos.func = read.csv('F:/Julien/PhD/Iximulew/MDS SAN/Datos calibración MDS/Datos ENCOVI/Limp_Actividades pecuarias.csv', header=1)
+datos.func.prod = read.csv('F:/Julien/PhD/Iximulew/MDS SAN/Datos calibración MDS/Datos ENCOVI/Limp_t27_cap14_e_final.csv', header = 1)
+
+# Base de datos para las características funcionales de los animales
 carac.func = data.frame(nombres)
+
+# Aquí calculamos distintas características funcionales de los animales. Estas incluyen:
+# 1. Porcentaje de animales vendidos recientemente, como índice del valor como seguro económico del animal
+# (los que casi no se venden serían guardados para emergencias)
+# 2. Ventas y consumo de productos 'de una vez' (p. ej. carne)
+# 3. Ventas y consumo de productos 'conutinúos' (lana, leche, huevos)
+# 4. Uso del animal como fuerza laboral
+# 5. Hembra o varón (si puede o no reproducirse)
+# 6. Unidades ganaderas del animal
 
 # Porcentaje de animales vendidos recientemente
 carac.func['ventas_animal'] = NA
+# Porcentaje de productores con este animal que vendieron productos animales de tipo carne
 carac.func['ventas_prod_perm'] = NA
+# Porcentaje de productores con este animal que vendieron productos de producción contínua 
+# (p.ej., leche, huevos), 
 carac.func['ventas_prod_cont'] = NA
+# Porcentaje de productores con este animal que consumieron productos animales de tipo carne de producción propia
 carac.func['consumo_prod_perm'] = NA
+# Porcentaje de productores con este animal que consumieron productos de producción contínua (p.ej., leche, huevos) de producción propia
 carac.func['consumo_prod_cont'] = NA
+# Si el animal se puede (1) o no (0) utilizar para trabajo
 carac.func['trabajo'] = NA
+# Si el animal es una hembra (0), varón (1), o no especificado (0.5)
 carac.func['hembra'] = NA
+# La cantidad de unidades ganaderas del animal
 carac.func['UG'] = NA
 
+
+# Calcular el % de animales de cada tipo que fueron vendidos el año pasado
 for (i in 1:length(nombres)) {
   sub.datos = datos.func[datos.func$P14D02A==i & 
                            !is.na(datos.func$P14D03) & datos.func$P14D03 > 0 &
@@ -680,15 +715,20 @@ for (i in 1:length(nombres)) {
 }
 
 
+# Si la base de datos contiene datos de ventas y consumo de productos de fuente animal,
+# mejor calcular estos valores con los datos reales que tienen
 carac.func['ventas_prod_perm'] = c(1,1,1,0,1,1,1,0,1,1)
 carac.func['ventas_prod_cont'] = c(1/3,0,1,1,1,0,0,0,0,0)
-carac.func['trabajo'] = c(1/3,0,0,0,0,0,0,1,0,0)
-# carac.func['consumo_prod_perm'] = NA
-# carac.func['consumo_prod_cont'] = NA
+carac.func['consumo_prod_perm'] = NA
+carac.func['consumo_prod_cont'] = NA
 
+# Cambiar según sus animales
+carac.func['trabajo'] = c(1/3,0,0,0,0,0,0,1,0,0)
 carac.func['hembra'] = 0.5
+
 carac.func['UG'] = ValorUG
 
+# Hacer los agrupamientos
 rownames(carac.func) <- carac.func[,1]
 carac.func <- carac.func[,-1]
 normalizados = scale(carac.func)
@@ -707,49 +747,83 @@ rect.hclust(hc, k=n_grupos, border="red")
 carac.func$grupo <- as.factor(cutree(hc, n_grupos))
 
 
-#### 8. Recorrer los modelos con diversidad funcional ####
+#### 8. Re-correr los modelos con diversidad funcional ####
+
+# Crear las listas con los nombres de los animales en cada grupo
+animales_grupos <- list(NULL)
+for (i in 1:n_grupos) {
+  animales_grupos[[i]] <- rownames(carac.func)[carac.func$grupo == i]
+  datos[paste('DiversidadGrupo', i, sep = '')] <- NA
+}
 
 for (i in 1:n_grupos) {
-  
+  datos[paste('AnimalesGrupo', i, sep = '')] <- NA
+  for (j in 1:length(animales_grupos[[i]])) {
+    datos[paste('AnimalesGrupo', i, sep = '')] <- 
+      rowSums(data.frame(datos[as.character(animales_grupos[[i]][j])], 
+                        datos[paste('AnimalesGrupo', i, sep = '')]),
+             na.rm = T)
+  }
+  datos[paste('Fracción', i, sep = '')] <- 
+    datos[paste('AnimalesGrupo', i, sep = '')] / datos$Totalanimales
 }
-#Diversidad funcional
-Grupo1 <- c("Animal5") #Animales grandes; rendimiento alimentario no contin?o; varones
-Grupo2 <- c("Animal1","Animal2","Animal3", "Animal5")  #Animales bastante grandes, con rendimiento contin?o no alimentario; por mayor parte varones
-# Grupo3 <- c("S50305","S50306","S50308","S50312","S50315","S50324") #Animales variable, con rendimineto alimentario por mayor parte contin?o; todas hembras
-Grupo4 <- c("Animal4","Animal6") #Animales m?s peque?os, con rendimineto alimentario por mayor parte no contin?o, mixtos hembras y varones
 
-data$Fracción1 <- NULL; data$Fracción2 <- NULL; data$Fracción3 <- NULL; data$Fracción4 <- NULL
-AnimalesGrupo1 <- NULL; AnimalesGrupo2 <- NULL; AnimalesGrupo3 <- NULL; AnimalesGrupo4 <- NULL
-data$Shannon.grupo1 <- NULL; data$Shannon.grupo2 <- NULL; data$Shannon.grupo3 <- NULL; data$Shannon.grupo4 <- NULL
-for (a in 1:500){
-  for(b in 1:length(Grupo1)){
-    AnimalesGrupo1[length(AnimalesGrupo1)+1] <- data[[Grupo1[b]]][a]
+datos['Diversidad_interGrupos'] <- NA
+for (i in 1:nrow(datos)) {
+  temp2 <- NULL
+  for (j in 1:n_grupos) {
+    temp <- NULL
+    temp1 <- NULL
+    for (k in 1:length(animales_grupos[[j]])) {
+      temp <- c(temp, datos[[animales_grupos[[j]][k]]][i])
+      temp1 <- sum(temp1, datos[[animales_grupos[[j]][k]]][i])
+    }
+    datos[[paste('DiversidadGrupo', j, sep = '')]][i] <- 
+      max(Shannon(temp),0)
+    temp2 <- c(temp2, temp1)
   }
-  for(b in 1:length(Grupo2)){
-    AnimalesGrupo2[length(AnimalesGrupo2)+1] <- data[[Grupo2[b]]][a]
-  }
-  for(b in 1:length(Grupo3)){
-    AnimalesGrupo3[length(AnimalesGrupo3)+1] <- data[[Grupo3[b]]][a]
-  }
-  for(b in 1:length(Grupo4)){
-    AnimalesGrupo4[length(AnimalesGrupo4)+1] <- data[[Grupo4[b]]][a]
-  }
-  data$Grupo1[a] <- sum(AnimalesGrupo1)
-  data$Grupo2[a] <- sum(AnimalesGrupo2)
-  data$Grupo3[a] <- sum(AnimalesGrupo3)
-  data$Grupo4[a] <- sum(AnimalesGrupo4)
-  data$Fracción1[a] <- sum(AnimalesGrupo1)/data$TotalAnimales[a]
-  data$Fracción2[a] <- sum(AnimalesGrupo2)/data$TotalAnimales[a]
-  data$Fracción3[a] <- sum(AnimalesGrupo3)/data$TotalAnimales[a]
-  data$Fracción4[a] <- sum(AnimalesGrupo4)/data$TotalAnimales[a]
-  data$Shannon.grupo1[a] <- max(Shannon(AnimalesGrupo1),0)
-  data$Shannon.grupo2[a] <- max(Shannon(AnimalesGrupo2),0)
-  data$Shannon.grupo3[a] <- max(Shannon(AnimalesGrupo3),0)
-  data$Shannon.grupo4[a] <- max(Shannon(AnimalesGrupo4),0)
-  data$Shannon.grupos[a] <- Shannon(c(data$Grupo1[a], data$Grupo2[a], data$Grupo3[a], data$Grupo4[a]))
-  AnimalesGrupo1 <- NULL; AnimalesGrupo2 <- NULL; AnimalesGrupo3 <- NULL; AnimalesGrupo4 <- NULL
+  datos[['Diversidad_interGrupos']][i] <- max(0, Shannon(c(temp2)))
 }
-range(data$Fracción1);range(data$Fracción2);range(data$Fracción3); range(data$Fracción4)
-range(data$Shannon.grupo1);range(data$Shannon.grupo2);range(data$Shannon.grupo3); range(data$Shannon.grupo4)
-range(data$Shannon.grupos)
-hist(data$Shannon.grupos)
+
+hist(datos$Diversidad_interGrupos)
+hist(datos$DiversidadGrupo2)
+hist(datos$DiversidadGrupo3)
+
+### Correr los análisis con diversidad inter y intra grupo funcional
+modelo.intergrupo <- clm(SegAli~log_Ingresoporcápita*log_UniGan*Diversidad_interGrupos*
+                           índ.escogido, 
+                         weights=Peso.estad, data=datos)
+summary(modelo.intergrupo)
+
+# Si hay interacciones no significativas, quitarlas
+
+### Diversidad intragrupo:
+
+# Primero, añadamos la diversidad intragrupo.
+# No ponemos la diversidad de grupos 1 y 4 porque estos sólo contienen un tipo de animal
+# (su divesidad siempre será de 0)
+modelo.diversIntragrupo <- clm(SegAli~log_Ingresoporcápita*log_UniGan*índ.escogido+
+                                 DiversidadGrupo2+DiversidadGrupo3,
+                               weights=Peso.estad, data=datos)
+summary(modelo.diversIntragrupo)
+
+# Ahora, con la fracción de animales en cada grupo
+modelo.fracIntragrupo <- clm(SegAli~log_Ingresoporcápita*log_UniGan*índ.escogido+
+                               Fracción1+Fracción2+Fracción3+Fracción4,
+                             weights=Peso.estad, data=datos)
+summary(modelo.fracIntragrupo)
+
+# Ahora, ¡con los dos!
+modelo.DFIntragrupo <- clm(SegAli~log_Ingresoporcápita*log_UniGan*índ.escogido+
+                               Fracción1+Fracción2+Fracción3+Fracción4+
+                               DiversidadGrupo2 + DiversidadGrupo3,
+                             weights=Peso.estad, data=datos)
+summary(modelo.DFIntragrupo)
+
+modelo.DFIntraIntergrupo <- clm(SegAli~log_Ingresoporcápita*log_UniGan*índ.escogido+
+                                  Fracción1+Fracción2+Fracción3+Fracción4+
+                                  DiversidadGrupo2 + DiversidadGrupo3 +
+                                  Diversidad_interGrupos + 
+                                  Diversidad_interGrupos*índ.escogido,
+                                weights=Peso.estad, data=datos)
+summary(modelo.DFIntraIntergrupo)
