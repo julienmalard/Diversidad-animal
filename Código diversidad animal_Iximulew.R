@@ -81,8 +81,8 @@ for (b in 1:16){
   temp = datos.hogares[[SegAli.col[b]]]
   temp[temp == "2"] <- 0
   temp[temp == "1"] <- 1
-  temp[temp == "9" | temp == "99"] <- 99
   temp[is.na(temp)] <- 0
+  temp[temp == "9" | temp == "99"] <- NA
   datos[[SegAli.col[b]]] <- temp
 }
 
@@ -93,24 +93,23 @@ for (a in 1:nrow(datos)){
   # Sumar las respuestas a las preguntas de la ELCSA
   temp <- 0
   for (b in 1:length(SegAli.col)) {
-    temp <- sum(temp, datos[[SegAli.col[b]]][a], na.rm = T)
+    if (b != 9) {
+      temp <- sum(temp, datos[[SegAli.col[b]]][a], na.rm = T)
+    }
   }
   datos$SegAli.puntaje[a] <- temp
-  
-  # Convertir el total de respuestas positivas a la categoría de inseguridad alimentaria
-  if(datos$SegAli.puntaje[a]==0) {datos$SegAli[a] <- 0}
-  if(datos[[SegAli.col[9]]][a]==0){  # Si hay niños en el hogar
-    if(datos$SegAli.puntaje[a]>=1 & datos$SegAli.puntaje[a]<=3){datos$SegAli[a]<- 1}
-    if(datos$SegAli.puntaje[a]>=4 & datos$SegAli.puntaje[a]<=6){datos$SegAli[a]<- 2}
-    if(datos$SegAli.puntaje[a]>=7 & datos$SegAli.puntaje[a]<=8){datos$SegAli[a]<- 3}
-  } else if (datos[[SegAli.col[9]]][a]==1) {  # Si no hay niños
-    if(datos$SegAli.puntaje[a]>=1 & datos$SegAli.puntaje[a]<=5){datos$SegAli[a]<- 1}
-    if(datos$SegAli.puntaje[a]>=6 & datos$SegAli.puntaje[a]<=10){datos$SegAli[a]<- 2}
-    if(datos$SegAli.puntaje[a]>=11 & datos$SegAli.puntaje[a]<=15){datos$SegAli[a]<- 3}
-  }
-  # Poner NA en las filas para cuales faltaban datos
-  for (b in 1:16){
-    if(datos[[SegAli.col[b]]][a]==9 | datos[[SegAli.col[b]]][a]==99) {datos[[SegAli.col[b]]][a]=NA}
+  if (!is.na(datos$SegAli.puntaje[a])){
+    # Convertir el total de respuestas positivas a la categoría de inseguridad alimentaria
+    if(datos$SegAli.puntaje[a]==0) {datos$SegAli[a] <- 0}
+    if(datos[[SegAli.col[9]]][a]==0){  # Si hay niños en el hogar
+      if(datos$SegAli.puntaje[a]>=1 & datos$SegAli.puntaje[a]<=3){datos$SegAli[a]<- 1}
+      if(datos$SegAli.puntaje[a]>=4 & datos$SegAli.puntaje[a]<=6){datos$SegAli[a]<- 2}
+      if(datos$SegAli.puntaje[a]>=7 & datos$SegAli.puntaje[a]<=8){datos$SegAli[a]<- 3}
+    } else if (datos[[SegAli.col[9]]][a]==1) {  # Si no hay niños
+      if(datos$SegAli.puntaje[a]>=1 & datos$SegAli.puntaje[a]<=5){datos$SegAli[a]<- 1}
+      if(datos$SegAli.puntaje[a]>=6 & datos$SegAli.puntaje[a]<=10){datos$SegAli[a]<- 2}
+      if(datos$SegAli.puntaje[a]>=11 & datos$SegAli.puntaje[a]<=15){datos$SegAli[a]<- 3}
+    }
   }
 }
 
@@ -154,6 +153,10 @@ datos["Shannon.UG"] <- NA
 datos["Gini.UG"] <- NA
 datos["BuzasGibson.UG"] <- NA
 
+# Una lista de los nombres de los tipos de animales en su base de datos.
+nombres = c("Vacas, Toros, Terneros","Cerdos","Ovejas, Peligueyes","Cabras",
+            "Gallinas, Pollos","Pavos, Chompipes","Patos","Caballos, Burros, Mulas",
+            "Colmenas","Peces, Camarones")
 
 # Nuestros datos de animales están en otra base de datos. Si los suyos ya se encuentran en 
 # 'datos', puede saltar estas líneas abajo.
@@ -197,11 +200,6 @@ for (i in 1:nrow(datos)){  # Para cada hogar
 # Si estaba saltando el código arriba porque su base de datos ya tenía los valores 
 # monetarios de los animales, aquí tiene que reempezar a seguir el código.
 # En ese caso, no se le olvide generar la lista col_val.animales apropiada (ver arriba).
-
-# Una lista de los nombres de los tipos de animales en su base de datos.
-nombres = c("Vacas, Toros, Terneros","Cerdos","Ovejas, Peligueyes","Cabras",
-            "Gallinas, Pollos","Pavos, Chompipes","Patos","Caballos, Burros, Mulas",
-            "Colmenas","Peces, Camarones")
 
 # Poner los valores de unidades ganaderas para cada tipo de animal.
 # DEBE estar en el mismo orden que "nombres".
@@ -274,10 +272,10 @@ Gini <- function(animales){
   return(valorGini)
 }
 
-Margalef <- function(animales){  #Margalef = (S-1)/N; S = no. de especies
+Margalef <- function(animales){  #Margalef = (S-1)/log(N); S = no. de especies
   animales <- animales[animales!=0]
   total <- sum(animales)
-  S = length(animales[animales!=0]) # n?mero de especies
+  S = length(animales[animales!=0]) # número de especies
   valorMargalef <- (S-1)/log(total)
   return(valorMargalef)
 }
@@ -304,7 +302,7 @@ for(a in 1:nrow(datos)){  # para cada hogar
   for(b in 1:length(nombres)){  # para cada tipo de animal
     animaleshogar[b] <- datos[[nombres[b]]][a]
   }
-  if (sum(animaleshogar) > 0) {
+  if (sum(animaleshogar, na.rm = T) > 0) {
     datos$Simpson[a] <- Simpson(animaleshogar)
     datos$Shannon[a] <- Shannon(animaleshogar)
     datos$Gini[a] <- Gini(animaleshogar)
@@ -610,7 +608,7 @@ summary(logit_Gini.UG)
 # summary(logit_Gini.UG)
 
 # escoger un índice que rindió mejor que los otros
-índ.escogido = datos$Shannon
+índ.escogido = datos$Shannon.UG
 
 #### 6. Analizar las interacciones ####
 
@@ -770,19 +768,19 @@ for (i in 1:n_grupos) {
 
 datos['Diversidad_interGrupos'] <- NA
 for (i in 1:nrow(datos)) {
-  temp2 <- NULL
+  lista_suma_grupo <- NULL
   for (j in 1:n_grupos) {
-    temp <- NULL
-    temp1 <- NULL
+    lista_grupo <- NULL
+    suma_grupo <- NULL
     for (k in 1:length(animales_grupos[[j]])) {
-      temp <- c(temp, datos[[animales_grupos[[j]][k]]][i])
-      temp1 <- sum(temp1, datos[[animales_grupos[[j]][k]]][i])
+      lista_grupo <- c(lista_grupo, datos[[animales_grupos[[j]][k]]][i]*ValorUG[k])
+      suma_grupo <- sum(suma_grupo, datos[[animales_grupos[[j]][k]]][i]*ValorUG[k])
     }
     datos[[paste('DiversidadGrupo', j, sep = '')]][i] <- 
-      max(Shannon(temp),0)
-    temp2 <- c(temp2, temp1)
+      max(Shannon(lista_grupo),0)
+    lista_suma_grupo <- c(lista_suma_grupo, suma_grupo)
   }
-  datos[['Diversidad_interGrupos']][i] <- max(0, Shannon(c(temp2)))
+  datos[['Diversidad_interGrupos']][i] <- max(0, Shannon(c(lista_suma_grupo)))
 }
 
 hist(datos$Diversidad_interGrupos)
