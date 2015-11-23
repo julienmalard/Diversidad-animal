@@ -9,12 +9,12 @@
 
 #### 1. Iniciar las bases de datos ####
 
-rm(list=ls())  # Borrar todo. 90% de los problemas en R se arreglan con esta comanda.
+rm(list=ls())  # Borrar todo. 90% de los problemas en R se arreglan con este paso.
 
 # Cambiar al directorio en su equipo con las bases de datos
 setwd("F:/Julien/Índices de biodiversidad/Haïti")
 
-# Si ya a pasado a través del código, cargue sus datos aquí:
+# Si ya pasó a través del código, cargue sus datos aquí:
 datos <- read.csv('Datos calculados.csv')
 
 # La base de datos de hogares (con ingresos, animales, seguridad alimentaria.) 
@@ -97,11 +97,10 @@ SegAli.col[9] <- "s809"
 # Ponemos 99 para datos que faltan (personas que no respondieron). Datos vacíos (NA) se consideran como 0.
 for (b in 1:16){
   temp = datos.hogares[[SegAli.col[b]]]
-  temp[temp == "9" | temp == "99"] <- 99
   if (b>9){
     temp[is.na(temp) & datos.hogares[[SegAli.col[9]]]==0] <- 0
   }
-  temp[is.na(temp)] <- 99
+  temp[temp == 9 | temp == 99] <- NA
   datos[[SegAli.col[b]]] <- temp
 }
 
@@ -112,35 +111,37 @@ for (a in 1:nrow(datos)){
   # Sumar las respuestas a las preguntas de la ELCSA
   temp <- 0
   for (b in 1:length(SegAli.col)) {
-    temp <- sum(temp, datos[[SegAli.col[b]]][a])
+    if(b != 9) {
+      temp <- sum(temp, datos[[SegAli.col[b]]][a])
+    }
   }
   datos$SegAli.puntaje[a] <- temp
   
   # Convertir el total de respuestas positivas a la categoría de inseguridad alimentaria
-  if(datos$SegAli.puntaje[a]==0) {datos$SegAli[a] <- 0}
-  if(datos[[SegAli.col[9]]][a]==0){  # Si hay niños en el hogar
-    if(datos$SegAli.puntaje[a]>=1 & datos$SegAli.puntaje[a]<=3){datos$SegAli[a]<- 1}
-    if(datos$SegAli.puntaje[a]>=4 & datos$SegAli.puntaje[a]<=6){datos$SegAli[a]<- 2}
-    if(datos$SegAli.puntaje[a]>=7 & datos$SegAli.puntaje[a]<=8){datos$SegAli[a]<- 3}
-  } else if (datos[[SegAli.col[9]]][a]==1) {  # Si no hay niños
-    if(datos$SegAli.puntaje[a]>=1 & datos$SegAli.puntaje[a]<=5){datos$SegAli[a]<- 1}
-    if(datos$SegAli.puntaje[a]>=6 & datos$SegAli.puntaje[a]<=10){datos$SegAli[a]<- 2}
-    if(datos$SegAli.puntaje[a]>=11 & datos$SegAli.puntaje[a]<=15){datos$SegAli[a]<- 3}
-  }
-  # Poner NA en las filas para cuales faltaban datos
-  for (b in 1:16){
-    if(datos[[SegAli.col[b]]][a]==9 | datos[[SegAli.col[b]]][a]==99) {datos[[SegAli.col[b]]][a]=NA}
+  if (is.na(datos$SegAli.puntaje[a])) {
+    datos$SegAli[a] <- NA
+  } else {
+    if(datos$SegAli.puntaje[a]==0) {datos$SegAli[a] <- 0}
+    if(datos[[SegAli.col[9]]][a]==0){  # Si hay niños en el hogar
+      if(datos$SegAli.puntaje[a]>=1 & datos$SegAli.puntaje[a]<=3){datos$SegAli[a]<- 1}
+      if(datos$SegAli.puntaje[a]>=4 & datos$SegAli.puntaje[a]<=6){datos$SegAli[a]<- 2}
+      if(datos$SegAli.puntaje[a]>=7 & datos$SegAli.puntaje[a]<=8){datos$SegAli[a]<- 3}
+    } else if (datos[[SegAli.col[9]]][a]==1) {  # Si no hay niños
+      if(datos$SegAli.puntaje[a]>=1 & datos$SegAli.puntaje[a]<=5){datos$SegAli[a]<- 1}
+      if(datos$SegAli.puntaje[a]>=6 & datos$SegAli.puntaje[a]<=10){datos$SegAli[a]<- 2}
+      if(datos$SegAli.puntaje[a]>=11 & datos$SegAli.puntaje[a]<=15){datos$SegAli[a]<- 3}
+    }
   }
 }
 
 # Verificar los cálculos
-weighted.mean(datos$SegAli.puntaje, datos$Peso.estad);weighted.mean(datos$SegAli, datos$Peso.estad, na.rm=T)
+weighted.mean(datos$SegAli.puntaje, datos$Peso.estad, na.rm=T);weighted.mean(datos$SegAli, datos$Peso.estad, na.rm=T)
 hist(datos$SegAli, main = 'Inseguridad alimentaria', ylab = 'Frecuencia', xlab = 'Categoría ELCSA')
 
 # Guardar su trabajo para mañana
 write.csv(datos,'Datos calculados.csv', row.names=FALSE)
 
-#### 3. Calcular los índices de diversidad animalia: ####
+#### 3. Calcular los índices de diversidad animal ####
 
 # Índices normales
 datos["Simpson"] <- NA
@@ -233,6 +234,7 @@ col_animales <- c('S50301', 'S50302', 'S50303', 'S50304', 'S50305', 'S50306', 'S
 
 for (i in 1:length(col_animales)) {
   datos[[nombres[i]]] <- datos.hogares[[col_animales[i]]]
+  names(datos[[nombres[i]]]) <- col_animales[i]
 }
 View(datos)
 
@@ -308,7 +310,7 @@ Gini <- function(animales){
   return(valorGini)
 }
 
-Margalef <- function(animales){  #Margalef = (S-1)/N; S = no. de especies
+Margalef <- function(animales){  #Margalef = (S-1)/log(N); S = no. de especies
   animales <- animales[animales!=0]
   total <- sum(animales)
   S = length(animales[animales!=0]) # n?mero de especies
@@ -594,7 +596,9 @@ datos$SegAli <- as.factor(datos$SegAli)  # Cambio de formato necesario para los 
 AIC <- NULL; logLik <- NULL  # Medidas de modelos estadísticos
 modelos <- list(NULL)  # Lista para guardar los resultados de los análisis
 for(a in 1:length(Índicesfinales)){
-  logit <- clm(SegAli~log_Ingresoporcápita*log_UniGan*datos[[Índicesfinales[a]]], weights=Peso.estad, data=datos)
+  logit <- clm(SegAli~log_Ingresoporcápita*log_UniGan*datos[[Índicesfinales[a]]], 
+               weights=Peso.estad, 
+               data=datos)
   AIC[a] <- as.numeric(levels(logit$info$AIC)[as.integer(logit$info$AIC)])
   logLik[a] <- logit$logLik
   assign(paste("logit_",Índicesfinales[a],sep=""),logit)
@@ -624,40 +628,45 @@ summary(logit_Gini.UG)
 
 # Si habían interacciones no significativas, quitarlas abajo y recorrer el análisis:
 
+AIC_final=logLik_final=NULL
 for(a in 1:length(Índicesfinales)){
-  logit <- clm(SegAli~log_Ingresoporcápita+log_UniGan+datos[[Índicesfinales[a]]]
+  logit <- clm(SegAli~log_Ingresoporcápita
+               +log_UniGan
+               +datos[[Índicesfinales[a]]]
                +log_UniGan*datos[[Índicesfinales[a]]]
-               , weights=Peso.estad, data=datos)
-  AIC[a] <- as.numeric(levels(logit$info$AIC)[as.integer(logit$info$AIC)])
-  logLik[a] <- logit$logLik
-  assign(paste("logit_",Índicesfinales[a],sep=""),logit)
-  modelos[[a]] <- logit
+               +log_Ingresoporcápita*datos[[Índicesfinales[a]]]
+               +log_UniGan*log_Ingresoporcápita
+               , weights=Peso.estad
+               , data=datos)
+  AIC_final[a] <- as.numeric(levels(logit$info$AIC)[as.integer(logit$info$AIC)])
+  logLik_final[a] <- logit$logLik
+  assign(paste("logit_final_",Índicesfinales[a],sep=""),logit)
 }
 
-summary(logit_Shannon)
-summary(logit_Shannon.UG)
-summary(logit_Margalef)
-summary(logit_Gini)
-summary(logit_Gini.val.ind)
-summary(logit_Gini.val.med)
-summary(logit_Gini.UG)
+summary(logit_final_Shannon)
+summary(logit_final_Shannon.UG)
+summary(logit_final_Margalef)
+summary(logit_final_Gini)
+summary(logit_final_Gini.val.ind)
+summary(logit_final_Gini.val.med)
+summary(logit_final_Gini.UG)
 
 
 # Un logLik negativo más pequeño es mejor
--logit_Shannon$logLik
--logit_Shannon.UG$logLik
--logit_Margalef$logLik
--logit_Gini$logLik
--logit_Gini.val.ind$logLik
--logit_Gini.val.med$logLik
--logit_Gini.UG$logLik
+-logit_final_Shannon$logLik
+-logit_final_Shannon.UG$logLik
+-logit_final_Margalef$logLik
+-logit_final_Gini$logLik
+-logit_final_Gini.val.ind$logLik
+-logit_final_Gini.val.med$logLik
+-logit_final_Gini.UG$logLik
 
 # Un AIC pequeño es mejor
-AIC
+AIC_final
 
 
 # escoger un índice que rindió mejor que los otros
-índ.escogido = datos$Gini.val.ind
+índ.escogido = datos$Shannon.UG
 
 #### 6. Analizar las interacciones ####
 
@@ -697,7 +706,15 @@ Inter <- function(x1,x2,y){
   return(c(interpuntos,plot))
 }
 
-# Verificar interactiones número de animales-diversidad
+# Verificar interactiones ingresos-diversidad
+Inter(datos$log_Ingresoporcápita, índ.escogido, as.numeric(datos$SegAli))
+Inter(índ.escogido, datos$log_Ingresoporcápita, as.numeric(datos$SegAli))
+
+# Verificar interactiones ingresos-UG
+Inter(datos$log_Ingresoporcápita, datos$log_UniGan, as.numeric(datos$SegAli))
+Inter(datos$log_UniGan, datos$log_Ingresoporcápita, as.numeric(datos$SegAli))
+
+# Verificar interactiones UG-diversidad
 Inter(datos$log_UniGan, índ.escogido, as.numeric(datos$SegAli))
 Inter(índ.escogido, datos$log_UniGan, as.numeric(datos$SegAli))
 
@@ -905,19 +922,19 @@ for (i in 1:n_grupos) {
 
 datos['Diversidad_interGrupos'] <- NA
 for (i in 1:nrow(datos)) {
-  temp2 <- NULL
+  lista_suma_grupo <- NULL
   for (j in 1:n_grupos) {
-    temp <- NULL
-    temp1 <- NULL
+    lista_grupo <- NULL
+    suma_grupo <- NULL
     for (k in 1:length(animales_grupos[[j]])) {
-      temp <- c(temp, datos[[animales_grupos[[j]][k]]][i])
-      temp1 <- sum(temp1, datos[[animales_grupos[[j]][k]]][i])
+      lista_grupo <- c(lista_grupo, datos[[animales_grupos[[j]][k]]][i]*ValorUG[k])
+      suma_grupo <- sum(suma_grupo, datos[[animales_grupos[[j]][k]]][i]*ValorUG[k])
     }
     datos[[paste('DiversidadGrupo', j, sep = '')]][i] <- 
-      max(Shannon(temp),0)
-    temp2 <- c(temp2, temp1)
+      max(Shannon(lista_grupo),0)
+    lista_suma_grupo <- c(lista_suma_grupo, suma_grupo)
   }
-  datos[['Diversidad_interGrupos']][i] <- max(0, Shannon(c(temp2)))
+  datos[['Diversidad_interGrupos']][i] <- max(0, Shannon(c(lista_suma_grupo)))
 }
 
 hist(datos$Diversidad_interGrupos)
@@ -925,7 +942,8 @@ hist(datos$Diversidad_interGrupos)
 
 ### Correr los análisis con diversidad inter y intra grupo funcional
 modelo.intergrupo <- clm(SegAli~log_Ingresoporcápita + log_UniGan + índ.escogido + 
-                           log_UniGan*índ.escogido + 
+                           log_Ingresoporcápita*índ.escogido + 
+                           log_Ingresoporcápita*log_UniGan + 
                            Diversidad_interGrupos,
                          weights=Peso.estad, data=datos)
 summary(modelo.intergrupo)
@@ -934,15 +952,25 @@ summary(modelo.intergrupo)
 
 # Primero, añadamos la diversidad intragrupo.
 modelo.diversIntragrupo <- clm(SegAli~log_Ingresoporcápita + log_UniGan + índ.escogido + 
-                                 log_UniGan*índ.escogido + 
+                                 log_Ingresoporcápita*índ.escogido + 
+                                 log_Ingresoporcápita*log_UniGan + 
                                  DiversidadGrupo1+DiversidadGrupo2+DiversidadGrupo3+
                                  DiversidadGrupo4+DiversidadGrupo5+DiversidadGrupo6,
                                weights=Peso.estad, data=datos)
 summary(modelo.diversIntragrupo)
 
+# Quitemos las cosas no significativas
+modelo.diversIntragrupo <- clm(SegAli~log_Ingresoporcápita + log_UniGan + índ.escogido + 
+                                 log_Ingresoporcápita*índ.escogido + 
+                                 log_Ingresoporcápita*log_UniGan + 
+                                 DiversidadGrupo1,
+                               weights=Peso.estad, data=datos)
+summary(modelo.diversIntragrupo)
+
 # Ahora, con la fracción de animales en cada grupo (cambiar FracciónX para cada grupo)
 modelo.fracIntragrupo <- clm(SegAli~log_Ingresoporcápita + log_UniGan + índ.escogido + 
-                               log_UniGan*índ.escogido+
+                               log_Ingresoporcápita*índ.escogido + 
+                               log_Ingresoporcápita*log_UniGan + 
                                Fracción1+Fracción2+Fracción3+Fracción4+Fracción5+Fracción6,
                              weights=Peso.estad, data=datos)
 summary(modelo.fracIntragrupo)
