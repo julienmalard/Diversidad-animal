@@ -12,7 +12,7 @@
 rm(list=ls())  # Borrar todo. 90% de los problemas en R se arreglan con este paso.
 
 # Cambiar al directorio en su equipo con las bases de datos
-setwd("F:/Julien/Índices de biodiversidad/Haïti")
+setwd("E:/Julien/PhD/Otros proyectos/Índices de biodiversidad/Haïti")
 
 # Si ya pasó a través del código, cargue sus datos aquí:
 datos <- read.csv('Datos calculados.csv')
@@ -80,10 +80,9 @@ hist(datos$log_Ingresoporcápita)
 
 # Guardar los datos para mañana
 write.csv(datos,'Datos calculados.csv', row.names=FALSE)  
+datos <- read.csv('Datos calculados.csv') 
 
 #### 2. Calcular la seguridad alimentaria ####
-datos["SegAli"] <- NA
-datos["SegAli.puntaje"] <- NA
 
 # Aquí, generar una lista de los nombres de las columnas de su base de datos que contienen
 # las respuestas a la ELCSA (Escala Latinoamericana y Caribeña de Seguridad Alimentaria).
@@ -94,7 +93,7 @@ for(a in 1:16){
 SegAli.col[9] <- "s809"
 
 # Poner 1 para respuestas positivas y 0 para negativas (ajustar a su base de datos)
-# Ponemos 99 para datos que faltan (personas que no respondieron). Datos vacíos (NA) se consideran como 0.
+# Datos que faltan (99 o 9) (personas que no respondieron) se representan con (NA).
 for (b in 1:16){
   temp = datos.hogares[[SegAli.col[b]]]
   if (b>9){
@@ -122,11 +121,11 @@ for (a in 1:nrow(datos)){
     datos$SegAli[a] <- NA
   } else {
     if(datos$SegAli.puntaje[a]==0) {datos$SegAli[a] <- 0}
-    if(datos[[SegAli.col[9]]][a]==0){  # Si hay niños en el hogar
+    if(datos[[SegAli.col[9]]][a]==0){  # Si no hay niños en el hogar
       if(datos$SegAli.puntaje[a]>=1 & datos$SegAli.puntaje[a]<=3){datos$SegAli[a]<- 1}
       if(datos$SegAli.puntaje[a]>=4 & datos$SegAli.puntaje[a]<=6){datos$SegAli[a]<- 2}
       if(datos$SegAli.puntaje[a]>=7 & datos$SegAli.puntaje[a]<=8){datos$SegAli[a]<- 3}
-    } else if (datos[[SegAli.col[9]]][a]==1) {  # Si no hay niños
+    } else if (datos[[SegAli.col[9]]][a]==1) {  # Si hay niños
       if(datos$SegAli.puntaje[a]>=1 & datos$SegAli.puntaje[a]<=5){datos$SegAli[a]<- 1}
       if(datos$SegAli.puntaje[a]>=6 & datos$SegAli.puntaje[a]<=10){datos$SegAli[a]<- 2}
       if(datos$SegAli.puntaje[a]>=11 & datos$SegAli.puntaje[a]<=15){datos$SegAli[a]<- 3}
@@ -181,6 +180,9 @@ nombres = c("Terneros","Novillos", "Toros", 'Toros de combate', "Novilla",
             'Gallinas', 'Pavos',
             'Pintadas', 'Patos', 'Otros aves', 'Conejos', 'Peces', "Conejos de Índia", 
             'Pigeones', 'Abejas', 'Bueyes', 'Caballos', 'Burros', 'Mulas', 'Otro')
+for (i in 1:length(nombres)) {
+  nombres[i] = make.names(nombres[i])
+}
 
 # Nuestros datos de animales están en otra base de datos. Si los suyos ya se encuentran en 
 # 'datos', puede saltar estas líneas abajo.
@@ -296,17 +298,22 @@ Shannon <- function(animales){  #Shannon = - sum (p*ln(p)); p = n/N ; n = no. de
 }
 
 Gini <- function(animales){ 
-  # Gini = 1/S * (S+1-2*sum((S+1-i)*n)/sum(n)), donde
-  # i = número de la especie n en orden de abundancia cresciendo
+  # Gini = 1 - 2/S * suma(i/S - suma(p))
+  # i = número de la especie y suma(p) la abundancia de esta especie más todas las especies anteriores,
+  # en orden de abundancia cresciendo
   animales <- animales[animales!=0]
-  ordenado <- sort(animales, decreasing=FALSE)  # ordenar a los dados en ?rden de abundancia
+  ordenado <- sort(animales, decreasing=FALSE)  # ordenar a los dados en órden de abundancia
   total <- sum(animales)
-  S = length(animales[animales!=0]) # n?mero de especies
-  sum <- 0
-  for (i in 1:length(ordenado)){
-    sum <- sum + ((S + 1 - i)*ordenado[i])
+  S = length(animales) # número de especies
+  suma <- 0
+  for (i in 1:S) {
+    suma2 <- 0
+    for (j in 1:i) {
+      suma2 <- suma2 + ordenado[j]/total
+    }
+    suma <- suma + (i/S - suma2)
   }
-  valorGini <- 1/S * (S + 1 - 2*sum/total)
+  valorGini <- 1 - 2 * suma/S
   return(valorGini)
 }
 
@@ -499,7 +506,7 @@ weighted.mean(datos$Gini.UG, datos$Peso.estad)
 weighted.mean(datos$BuzasGibson.UG, datos$Peso.estad)
 
 write.csv(datos,'Datos calculados.csv', row.names=FALSE)  # guardar los resultados
-
+datos <- read.csv('Datos calculados.csv')
 
 #### 4. Escoger los índices de diversidad únicos ####
 
@@ -585,7 +592,7 @@ datos.Índicesfin <- data.frame(datos.Índicesfin)
 # Visualizar las correlaciones entre los índices escogidos
 plot(datos.Índicesfin)
 
-install.packages("ordinal")  # Instalar si necesario
+# install.packages("ordinal")  # Instalar si necesario
 library("ordinal")
 
 
@@ -630,12 +637,13 @@ summary(logit_Gini.UG)
 
 AIC_final=logLik_final=NULL
 for(a in 1:length(Índicesfinales)){
-  logit <- clm(SegAli~log_Ingresoporcápita
-               +log_UniGan
-               +datos[[Índicesfinales[a]]]
-               +log_UniGan*datos[[Índicesfinales[a]]]
-               +log_Ingresoporcápita*datos[[Índicesfinales[a]]]
-               +log_UniGan*log_Ingresoporcápita
+  logit <- clm(SegAli~
+                 log_Ingresoporcápita
+                +log_UniGan
+                +datos[[Índicesfinales[a]]]
+                +log_UniGan*datos[[Índicesfinales[a]]]
+#                +log_Ingresoporcápita*datos[[Índicesfinales[a]]]
+#                +log_UniGan*log_Ingresoporcápita
                , weights=Peso.estad
                , data=datos)
   AIC_final[a] <- as.numeric(levels(logit$info$AIC)[as.integer(logit$info$AIC)])
@@ -666,7 +674,7 @@ AIC_final
 
 
 # escoger un índice que rindió mejor que los otros
-índ.escogido = datos$Shannon.UG
+índ.escogido = datos$Shannon
 
 #### 6. Analizar las interacciones ####
 
@@ -678,8 +686,8 @@ Inter <- function(x1,x2,y){
   # quant1 <- c(mín, (mín + med)/2, med, (med + máx)/2, máx)
   # mín = min(x2, na.rm=2); máx = max(x2, na.rm=2); med = mín+máx/2
   # quant2 <- c(mín, (mín + med)/2, med, (med + máx)/2, máx)
-  # print(quant1)
-  # print(quant2)
+  print(quant1)
+  print(quant2)
   
   combin <- data.frame(x1,x2,y)
   
@@ -843,9 +851,12 @@ for (i in 1:length(nombres)) {
     
     # Calcular el  % de la producción animal vendida
     fracción_prod_vendida <- datos.hogares[[col_prod_perm[i]]] / datos.hogares[[col_matados[i]]]
-    carac.func$ventas_prod_perm[i] <- sum(fracción_prod_vendida, na.rm = T)
+    fracción_prod_vendida[fracción_prod_vendida > 1] <- NA
+    carac.func$ventas_prod_perm[i] <- mean(fracción_prod_vendida, na.rm = T)
+    
     fracción_prod_consumida <- datos.hogares[[col_cons_perm[i]]] / datos.hogares[[col_matados[i]]]
-    carac.func$consumo_prod_perm[i] = sum(fracción_prod_consumida, na.rm = T)
+    fracción_prod_consumida[fracción_prod_consumida > 1] <- NA
+    carac.func$consumo_prod_perm[i] = mean(fracción_prod_consumida, na.rm = T)
     
     # Calcular el % de la producción continua vendida y consumida
     productos_cont <- 0
@@ -865,12 +876,20 @@ for (i in 1:length(nombres)) {
     fracción_vendida <- productos_cont_vendidos / productos_cont
     fracción_consumida <- productos_cont_consumidos / productos_cont
     
+    if (! length(fracción_vendida)) {
+      fracción_vendida <- 0
+    }
+    if (! length(fracción_consumida)) {
+      fracción_consumida <- 0
+    }
+    
   } else {  # Si no hay datos para este animal
     fracción_vendida <- NA
     fracción_consumida <- NA
   }
-  carac.func['ventas_prod_cont'] = max(0,sum(fracción_vendida, na.rm = T))
-  carac.func['consumo_prod_cont'] = max(0,sum(fracción_consumida, na.rm = T))
+
+  carac.func$ventas_prod_cont[i] = max(0,mean(fracción_vendida, na.rm = T))
+  carac.func$consumo_prod_cont[i] = max(0,mean(fracción_consumida, na.rm = T))
 }
 
 
@@ -887,7 +906,7 @@ normalizados = scale(carac.func)
 
 d <- dist(as.matrix(normalizados))  # matriz de distancia
 hc <- hclust(d)  # agrupammiento hierárchico 
-plot(hc)  # Verificar el árbol de agrupamiento
+plot(hc, main="Dendograma de agrupamiento", xlab='', ylab='Altura')  # Verificar el árbol de agrupamiento
 
 # Escoger el número de grupos que quiere usted
 n_grupos = 6
@@ -898,6 +917,15 @@ rect.hclust(hc, k=n_grupos, border="red")
 # Añadir el grupo a la base de datos de características de cada tipo de animal
 carac.func$grupo <- as.factor(cutree(hc, n_grupos))
 
+# Ver las diferencias entre los grupos
+for (i in 1:length(colnames(carac.func))){
+  característica = colnames(carac.func)[i]
+  print(característica)
+  for (n in 1:n_grupos) {
+    temp <- carac.func[carac.func$grupo == n, ]
+    print(paste('Grupo', n, ':', mean(temp[[característica]], na.rm=T)))
+  }
+}
 
 #### 8. Re-correr los modelos con diversidad funcional ####
 
@@ -942,8 +970,7 @@ hist(datos$Diversidad_interGrupos)
 
 ### Correr los análisis con diversidad inter y intra grupo funcional
 modelo.intergrupo <- clm(SegAli~log_Ingresoporcápita + log_UniGan + índ.escogido + 
-                           log_Ingresoporcápita*índ.escogido + 
-                           log_Ingresoporcápita*log_UniGan + 
+                           índ.escogido*log_UniGan+
                            Diversidad_interGrupos,
                          weights=Peso.estad, data=datos)
 summary(modelo.intergrupo)
@@ -952,8 +979,7 @@ summary(modelo.intergrupo)
 
 # Primero, añadamos la diversidad intragrupo.
 modelo.diversIntragrupo <- clm(SegAli~log_Ingresoporcápita + log_UniGan + índ.escogido + 
-                                 log_Ingresoporcápita*índ.escogido + 
-                                 log_Ingresoporcápita*log_UniGan + 
+                                 índ.escogido*log_UniGan+
                                  DiversidadGrupo1+DiversidadGrupo2+DiversidadGrupo3+
                                  DiversidadGrupo4+DiversidadGrupo5+DiversidadGrupo6,
                                weights=Peso.estad, data=datos)
@@ -961,16 +987,14 @@ summary(modelo.diversIntragrupo)
 
 # Quitemos las cosas no significativas
 modelo.diversIntragrupo <- clm(SegAli~log_Ingresoporcápita + log_UniGan + índ.escogido + 
-                                 log_Ingresoporcápita*índ.escogido + 
-                                 log_Ingresoporcápita*log_UniGan + 
+                                 índ.escogido*log_UniGan+
                                  DiversidadGrupo1,
                                weights=Peso.estad, data=datos)
 summary(modelo.diversIntragrupo)
 
 # Ahora, con la fracción de animales en cada grupo (cambiar FracciónX para cada grupo)
 modelo.fracIntragrupo <- clm(SegAli~log_Ingresoporcápita + log_UniGan + índ.escogido + 
-                               log_Ingresoporcápita*índ.escogido + 
-                               log_Ingresoporcápita*log_UniGan + 
-                               Fracción1+Fracción2+Fracción3+Fracción4+Fracción5+Fracción6,
+                               índ.escogido*log_UniGan+
+                               Fracción1+Fracción2+Fracción3+Fracción4+Fracción5,
                              weights=Peso.estad, data=datos)
 summary(modelo.fracIntragrupo)
